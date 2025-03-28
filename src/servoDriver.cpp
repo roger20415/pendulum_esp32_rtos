@@ -1,6 +1,6 @@
-#include <armDriver.hpp>
+#include <servoDriver.hpp>
 
-void ArmManager::setServoAngle(uint8_t servoNum, float angle) {
+void ServoManager::setServoAngle(uint8_t servoNum, float angle) {
     if (servoNum < this->numServos) {
         pwm.writeMicroseconds(
             servoNum,
@@ -10,7 +10,7 @@ void ArmManager::setServoAngle(uint8_t servoNum, float angle) {
     }
 }
 
-ArmManager::ArmManager(
+ServoManager::ServoManager(
     const uint8_t numServos, const uint8_t servoMinAngles[],
     const uint8_t servoMaxAngles[], const uint8_t servoInitAngles[]) {
     // Initialize the Adafruit_PWMServoDriver object
@@ -32,22 +32,22 @@ ArmManager::ArmManager(
         /*************************************************************************
         You cannot set the current angles by reading the initial angles directly.
         You can set the current angles to be "near" the initial angles
-            to ensure that the robot arm doesn't perform redundant actions.
+            to ensure that the robot doesn't perform redundant actions.
         If you set the current angles to be the same as the initial angles,
-            then the robot arm will not move when starting up.
+            then the robot will not move when starting up.
         **************************************************************************/
         this->servoCurrentAngles[i] = (float)servoInitAngles[i] + 1;
     }
 }
 
-void ArmManager::setServoTargetAngle(uint8_t servoNum, uint8_t targetAngle) {
+void ServoManager::setServoTargetAngle(uint8_t servoNum, uint8_t targetAngle) {
     if (servoNum < this->numServos) {
         this->servoTargetAngles[servoNum] = constrain(targetAngle, servoMinAngles[servoNum],
                                                       servoMaxAngles[servoNum]);
     }
 }
 
-void ArmManager::changeServoTargetAngle(uint8_t servoNum, int8_t biasAngle) {
+void ServoManager::changeServoTargetAngle(uint8_t servoNum, int8_t biasAngle) {
     if (servoNum < this->numServos) {
         this->servoTargetAngles[servoNum] = constrain(servoTargetAngles[servoNum] + biasAngle,
                                                       servoMinAngles[servoNum], servoMaxAngles[servoNum]);
@@ -55,16 +55,16 @@ void ArmManager::changeServoTargetAngle(uint8_t servoNum, int8_t biasAngle) {
 }
 
 // Get the current angles of all servos, update currentAngles into passed array
-void ArmManager::getCurrentAngles(float currentAngles[]) {
+void ServoManager::getCurrentAngles(float currentAngles[]) {
     for (uint8_t i = 0; i < this->numServos; ++i) {
         currentAngles[i] = servoCurrentAngles[i];
     }
 }
 
-void ArmManager::moveArm() {
+void ServoManager::moveServo() {
     for (uint8_t i = 0; i < this->numServos; ++i) {
-        if (abs(this->servoCurrentAngles[i] - this->servoTargetAngles[i]) >= ARM_MOVEMENT_STEP) {
-            float step = (this->servoTargetAngles[i] > this->servoCurrentAngles[i]) ? ARM_MOVEMENT_STEP : -ARM_MOVEMENT_STEP;
+        if (abs(this->servoCurrentAngles[i] - this->servoTargetAngles[i]) >= SERVO_MOVEMENT_STEP) {
+            float step = (this->servoTargetAngles[i] > this->servoCurrentAngles[i]) ? SERVO_MOVEMENT_STEP : -SERVO_MOVEMENT_STEP;
             this->servoCurrentAngles[i] += step;
             // this line will occur some delay to let device work not properly
             // please make sure you had connect to PCA9685 pwm driver.

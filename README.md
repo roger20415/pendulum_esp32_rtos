@@ -1,4 +1,4 @@
-# ESP32 C++ Code for Controlling Robot Arm
+# ESP32 C++ Code for Controlling Robot
 
 We need the following items.
 

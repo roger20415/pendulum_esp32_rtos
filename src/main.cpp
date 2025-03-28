@@ -6,8 +6,9 @@
 #include <rmw_microros/rmw_microros.h>
 #include <std_msgs/msg/int32.h>
 #include <trajectory_msgs/msg/joint_trajectory_point.h>
+#include <std_msgs/msg/float32_multi_array.h>
 
-#include <armDriver.hpp>
+#include <servoDriver.hpp>
 #include <esp32_led.hpp>
 #include <params.hpp>
 
@@ -20,18 +21,18 @@ rclc_support_t support;
 rcl_node_t node;
 
 // subscriber
-rcl_subscription_t arm_sub, hand_sub;
-trajectory_msgs__msg__JointTrajectoryPoint arm_msg_sub, hand_msg_sub;
-rclc_executor_t arm_executor_sub, hand_executor_sub;
+rcl_subscription_t action_sub;
+trajectory_msgs__msg__JointTrajectoryPoint action_msg_sub;
+rclc_executor_t action_executor_sub;
 
 // publisher
-rcl_publisher_t arm_pub, hand_pub;
-trajectory_msgs__msg__JointTrajectoryPoint arm_msg_pub, hand_msg_pub;
-rclc_executor_t arm_executor_pub, hand_executor_pub;
-rcl_timer_t arm_timer, hand_timer;
+rcl_publisher_t obs_pub;
+std_msgs__msg__Float32MultiArray obs_msg_pub;
+rclc_executor_t obs_executor_pub;
+rcl_timer_t obs_timer;
 
-// Global variables shared between the microROS task and the arm control task
-double joint_positions[NUM_ALL_SERVOS] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+// Global variables shared between the microROS task and the servo control task
+double joint_positions[NUM_ALL_SERVOS] = {0.0};
 
 #define RCCHECK(fn)                    \
     {                                  \
@@ -60,36 +61,19 @@ double joint_positions[NUM_ALL_SERVOS] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
 states state;
 
-void arm_subscription_callback(const void *msgin) {
+void action_subscription_callback(const void *msgin) {
     const trajectory_msgs__msg__JointTrajectoryPoint *msg = (const trajectory_msgs__msg__JointTrajectoryPoint *)msgin;
     for (size_t i = 0; i < msg->positions.size; ++i) {
-        joint_positions[i + ARM_OFFSET] = degrees(msg->positions.data[i]);
+        joint_positions[i + SERVO_OFFSET] = degrees(msg->positions.data[i]);
     }
 }
 
-void arm_timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
+void obs_timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
     RCLC_UNUSED(last_call_time);
     if (timer != NULL) {
-        RCSOFTCHECK(rcl_publish(&arm_pub, &arm_msg_pub, NULL));
-        for (size_t i = 0; i < arm_msg_pub.positions.capacity; i++) {
-            arm_msg_pub.positions.data[i] = joint_positions[i + ARM_OFFSET];
-        }
-    }
-}
-
-void hand_subscription_callback(const void *msgin) {
-    const trajectory_msgs__msg__JointTrajectoryPoint *msg = (const trajectory_msgs__msg__JointTrajectoryPoint *)msgin;
-    for (size_t i = 0; i < msg->positions.size; ++i) {
-        joint_positions[i + HAND_OFFSET] = degrees(msg->positions.data[i]);
-    }
-}
-
-void hand_timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
-    RCLC_UNUSED(last_call_time);
-    if (timer != NULL) {
-        RCSOFTCHECK(rcl_publish(&hand_pub, &hand_msg_pub, NULL));
-        for (size_t i = 0; i < hand_msg_pub.positions.capacity; i++) {
-            hand_msg_pub.positions.data[i] = joint_positions[i + HAND_OFFSET];
+        RCSOFTCHECK(rcl_publish(&obs_pub, &obs_msg_pub, NULL));
+        for (size_t i = 0; i < obs_msg_pub.data.capacity; i++) {
+            obs_msg_pub.data.data[i] = 0.0f;
         }
     }
 }
@@ -109,80 +93,43 @@ bool create_entities() {
     // create node
     RCCHECK(rclc_node_init_default(&node, "micro_ros_platformio_node", "", &support));
 
-    // create arm subscriber
+    // create action subscriber
     RCCHECK(rclc_subscription_init_default(
-        &arm_sub,
+        &action_sub,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(trajectory_msgs, msg, JointTrajectoryPoint),
-        "/right_arm"));
+        "/inverted_pendulum_target_joint_angles"));
 
-    arm_msg_sub.positions.capacity = NUM_ARM_SERVOS;
-    arm_msg_sub.positions.size = NUM_ARM_SERVOS;
-    arm_msg_sub.positions.data = (double *)calloc(arm_msg_sub.positions.capacity, sizeof(double));
+    action_msg_sub.positions.capacity = NUM_ALL_SERVOS;
+    action_msg_sub.positions.size = NUM_ALL_SERVOS;
+    action_msg_sub.positions.data = (double *)calloc(action_msg_sub.positions.capacity, sizeof(double));
 
-    // create arm subscriber executor
-    RCCHECK(rclc_executor_init(&arm_executor_sub, &support.context, 1, &allocator));
-    RCCHECK(rclc_executor_add_subscription(&arm_executor_sub, &arm_sub, &arm_msg_sub, &arm_subscription_callback, ON_NEW_DATA));
+    // create action subscriber executor
+    RCCHECK(rclc_executor_init(&action_executor_sub, &support.context, 1, &allocator));
+    RCCHECK(rclc_executor_add_subscription(&action_executor_sub, &action_sub, &action_msg_sub, &action_subscription_callback, ON_NEW_DATA));
 
-    // create hand subscriber
-    RCCHECK(rclc_subscription_init_default(
-        &hand_sub,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(trajectory_msgs, msg, JointTrajectoryPoint),
-        "/right_hand"));
-
-    hand_msg_sub.positions.capacity = NUM_HAND_SERVOS;
-    hand_msg_sub.positions.size = NUM_HAND_SERVOS;
-    hand_msg_sub.positions.data = (double *)calloc(hand_msg_sub.positions.capacity, sizeof(double));
-
-    // create hand subscriber executor
-    RCCHECK(rclc_executor_init(&hand_executor_sub, &support.context, 1, &allocator));
-    RCCHECK(rclc_executor_add_subscription(&hand_executor_sub, &hand_sub, &hand_msg_sub, &hand_subscription_callback, ON_NEW_DATA));
-
-    // create arm publisher
+    // create obs publisher
     RCCHECK(rclc_publisher_init_default(
-        &arm_pub,
+        &obs_pub,
         &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(trajectory_msgs, msg, JointTrajectoryPoint),
-        "/right_arm_republish"));
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32MultiArray),
+        "/state_topic"));
 
-    // create arm timer, this timer sets the period for publishing data.
+    // create obs timer, this timer sets the period for publishing obs data.
     const unsigned int timer_timeout = 50;
     RCCHECK(rclc_timer_init_default(
-        &arm_timer,
+        &obs_timer,
         &support,
         RCL_MS_TO_NS(timer_timeout),  // Timer period in nanoseconds
-        arm_timer_callback));
+        obs_timer_callback));
 
-    arm_msg_pub.positions.capacity = NUM_ARM_SERVOS;
-    arm_msg_pub.positions.size = NUM_ARM_SERVOS;
-    arm_msg_pub.positions.data = (double *)calloc(arm_msg_pub.positions.capacity, sizeof(double));
+    obs_msg_pub.data.capacity = NUM_OBS;
+    obs_msg_pub.data.size = NUM_OBS;
+    obs_msg_pub.data.data = (double *)calloc(obs_msg_pub.data.capacity, sizeof(double));
 
-    // create arm publisher executor
-    RCCHECK(rclc_executor_init(&arm_executor_pub, &support.context, 1, &allocator));
-    RCCHECK(rclc_executor_add_timer(&arm_executor_pub, &arm_timer));
-
-    // create hand publisher
-    RCCHECK(rclc_publisher_init_default(
-        &hand_pub,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(trajectory_msgs, msg, JointTrajectoryPoint),
-        "/right_hand_republish"));
-
-    // create hand timer, this timer sets the period for publishing data.
-    RCCHECK(rclc_timer_init_default(
-        &hand_timer,
-        &support,
-        RCL_MS_TO_NS(timer_timeout),  // Timer period in nanoseconds
-        hand_timer_callback));
-
-    hand_msg_pub.positions.capacity = NUM_HAND_SERVOS;
-    hand_msg_pub.positions.size = NUM_HAND_SERVOS;
-    hand_msg_pub.positions.data = (double *)calloc(hand_msg_pub.positions.capacity, sizeof(double));
-
-    // create hand publisher executor
-    RCCHECK(rclc_executor_init(&hand_executor_pub, &support.context, 1, &allocator));
-    RCCHECK(rclc_executor_add_timer(&hand_executor_pub, &hand_timer));
+    // create obs publisher executor
+    RCCHECK(rclc_executor_init(&obs_executor_pub, &support.context, 1, &allocator));
+    RCCHECK(rclc_executor_add_timer(&obs_executor_pub, &obs_timer));
 
     return true;
 }
@@ -191,35 +138,20 @@ void destroy_entities() {
     rmw_context_t *rmw_context = rcl_context_get_rmw_context(&support.context);
     (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
-    // arm subscriber
-    RCSOFTCHECK(rcl_subscription_fini(&arm_sub, &node));
-    RCSOFTCHECK(rclc_executor_fini(&arm_executor_sub));
+    // action subscriber
+    RCSOFTCHECK(rcl_subscription_fini(&action_sub, &node));
+    RCSOFTCHECK(rclc_executor_fini(&action_executor_sub));
 
-    free(arm_msg_sub.positions.data);
-    arm_msg_sub.positions.data = NULL;
+    free(action_msg_sub.positions.data);
+    action_msg_sub.positions.data = NULL;
 
-    // hand subscriber
-    RCSOFTCHECK(rcl_subscription_fini(&hand_sub, &node));
-    RCSOFTCHECK(rclc_executor_fini(&hand_executor_sub));
+    // obs publisher
+    RCSOFTCHECK(rcl_publisher_fini(&obs_pub, &node));
+    RCSOFTCHECK(rcl_timer_fini(&obs_timer));
+    RCSOFTCHECK(rclc_executor_fini(&obs_executor_pub));
 
-    free(hand_msg_sub.positions.data);
-    hand_msg_sub.positions.data = NULL;
-
-    // arm publisher
-    RCSOFTCHECK(rcl_publisher_fini(&arm_pub, &node));
-    RCSOFTCHECK(rcl_timer_fini(&arm_timer));
-    RCSOFTCHECK(rclc_executor_fini(&arm_executor_pub));
-
-    free(arm_msg_pub.positions.data);
-    arm_msg_pub.positions.data = NULL;
-
-    // hand publisher
-    RCSOFTCHECK(rcl_publisher_fini(&hand_pub, &node));
-    RCSOFTCHECK(rcl_timer_fini(&hand_timer));
-    RCSOFTCHECK(rclc_executor_fini(&hand_executor_pub));
-
-    free(hand_msg_pub.positions.data);
-    hand_msg_pub.positions.data = NULL;
+    free(obs_msg_pub.data.data);
+    obs_msg_pub.data.data = NULL;
 
     // common
     RCSOFTCHECK(rcl_node_fini(&node));
@@ -242,10 +174,8 @@ void microROSTaskFunction(void *parameter) {
             case AGENT_CONNECTED:
                 EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(500, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
                 if (state == AGENT_CONNECTED) {
-                    rclc_executor_spin_some(&arm_executor_sub, RCL_MS_TO_NS(100));
-                    rclc_executor_spin_some(&hand_executor_sub, RCL_MS_TO_NS(100));
-                    rclc_executor_spin_some(&arm_executor_pub, RCL_MS_TO_NS(100));
-                    rclc_executor_spin_some(&hand_executor_pub, RCL_MS_TO_NS(100));
+                    rclc_executor_spin_some(&action_executor_sub, RCL_MS_TO_NS(100));
+                    rclc_executor_spin_some(&obs_executor_pub, RCL_MS_TO_NS(100));
                 }
                 break;
             case AGENT_DISCONNECTED:
@@ -258,17 +188,17 @@ void microROSTaskFunction(void *parameter) {
     }
 }
 
-void armControlTaskFunction(void *parameter) {
-    ArmManager armManager(uint8_t(NUM_ALL_SERVOS), servoMinAngles, servoMaxAngles, servoInitAngles);
+void ServoControlTaskFunction(void *parameter) {
+    ServoManager servoManager(uint8_t(NUM_ALL_SERVOS), servoMinAngles, servoMaxAngles, servoInitAngles);
 
     while (true) {
         for (size_t i = 0; i < NUM_ALL_SERVOS; ++i) {
-            armManager.setServoTargetAngle(i, uint8_t(joint_positions[i]));
+            servoManager.setServoTargetAngle(i, uint8_t(joint_positions[i]));
         }
-        armManager.moveArm();
+        servoManager.moveServo();
 
         // Wait for some time before the next iteration
-        vTaskDelay(UPDATE_ARM_DELAY / portTICK_PERIOD_MS);
+        vTaskDelay(UPDATE_SERVO_DELAY / portTICK_PERIOD_MS);
     }
 }
 
@@ -295,8 +225,8 @@ void setup() {
     );
     delay(100);
     xTaskCreate(
-        armControlTaskFunction,  // Task function
-        "Arm Control Task",      // Task name
+        ServoControlTaskFunction,  // Task function
+        "Servo Control Task",      // Task name
         4096,                    // Stack size (in bytes)
         NULL,                    // Task parameters
         2,                       // Task priority

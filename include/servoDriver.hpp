@@ -10,28 +10,27 @@
  */
 
 /**
- * @class ArmManager
- * @brief Manages the servos of a robotic arm using the Adafruit PWM Servo Driver.
+ * @class ServoManager
+ * @brief Manages the servos of a robot using the Adafruit PWM Servo Driver.
  *
- * This class provides methods to initialize and control multiple servos connected to a
- * robotic arm. It allows setting target angles for each servo and moves the servos
+ * This class provides methods to initialize and control multiple servos. It allows setting target angles for each servo and moves the servos
  * incrementally towards their target angles.
  *
  * @details
- * The ArmManager class handles the initialization of the Adafruit PWM Servo Driver,
+ * The ServoManager class handles the initialization of the Adafruit PWM Servo Driver,
  * sets the PWM frequency, and manages the angles of the servos. It ensures that the
  * servos move smoothly by incrementing their angles in small steps.
  *
  * @note
  * The servo angles are constrained within the specified minimum and maximum angles
- * to prevent damage to the servos or the robotic arm.
+ * to prevent damage to the servos.
  *
  * @param numServos The number of servos to manage.
  * @param servoMinAngles An array of minimum angles for each servo.
  * @param servoMaxAngles An array of maximum angles for each servo.
  * @param servoInitAngles An array of initial angles for each servo.
  */
-class ArmManager {
+class ServoManager {
    private:
     static const uint16_t SERVO_MIN_PULSE_WIDTH = 500;
     static const uint16_t SERVO_MAX_PULSE_WIDTH = 2500;
@@ -54,14 +53,14 @@ class ArmManager {
 
    public:
     /**
-     * @brief Constructs an ArmManager object.
+     * @brief Constructs an ServoManager object.
      *
      * @param numServos The number of servos to manage.
      * @param servoMinAngles An array of minimum angles for each servo.
      * @param servoMaxAngles An array of maximum angles for each servo.
      * @param servoInitAngles An array of initial angles for each servo.
      */
-    ArmManager(
+    ServoManager(
         const uint8_t numServos, const uint8_t servoMinAngles[],
         const uint8_t servoMaxAngles[], const uint8_t servoInitAngles[]);
 
@@ -89,7 +88,7 @@ class ArmManager {
     void getCurrentAngles(float currentAngles[]);
 
     /**
-     * @brief Moves the arm by incrementing the angles of the servos towards their target angles.
+     * @brief Moves the servo by incrementing the angles of the servos towards their target angles.
      */
-    void moveArm();
+    void moveServo();
 };
