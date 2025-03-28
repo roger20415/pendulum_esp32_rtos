@@ -125,7 +125,7 @@ bool create_entities() {
 
     obs_msg_pub.data.capacity = NUM_OBS;
     obs_msg_pub.data.size = NUM_OBS;
-    obs_msg_pub.data.data = (double *)calloc(obs_msg_pub.data.capacity, sizeof(double));
+    obs_msg_pub.data.data = (float *)calloc(obs_msg_pub.data.capacity, sizeof(float));
 
     // create obs publisher executor
     RCCHECK(rclc_executor_init(&obs_executor_pub, &support.context, 1, &allocator));
@@ -204,8 +204,8 @@ void ServoControlTaskFunction(void *parameter) {
 
 void setup() {
     // Configure serial transport
-    Serial.begin(115200);
-    set_microros_serial_transports(Serial);
+  Serial.begin(115200);
+  set_microros_serial_transports(Serial);
     delay(100);
 
     state = WAITING_AGENT;
