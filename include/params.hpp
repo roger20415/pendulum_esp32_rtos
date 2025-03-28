@@ -9,6 +9,9 @@
  * ON Board LED GPIO 2
  * Ref: https://circuits4you.com/2018/02/02/esp32-led-blink-example/
  */
+#define ROS_DOMAIN_ID 1
+#define NODE_NAME "micro_ros_platformio_node"
+#define NAMESPACE ""
 #define ESP32_LED 2
 #define UPDATE_SERVO_DELAY 1.0
 const float SERVO_MOVEMENT_STEP = 1.0;

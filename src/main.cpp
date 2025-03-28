@@ -17,6 +17,7 @@
 #endif
 
 rcl_allocator_t allocator;
+rcl_init_options_t init_options;
 rclc_support_t support;
 rcl_node_t node;
 
@@ -85,13 +86,19 @@ void obs_timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
  * - UCLIENT_MAX_SESSION_CONNECTION_ATTEMPTS=3
  */
 bool create_entities() {
+    // Initialize micro-ROS allocator
     allocator = rcl_get_default_allocator();
 
+    // Initialize and modify options (Set DOMAIN ID)
+    init_options = rcl_get_zero_initialized_init_options();
+    RCCHECK(rcl_init_options_init(&init_options, allocator));
+    RCCHECK(rcl_init_options_set_domain_id(&init_options, ROS_DOMAIN_ID));
+    
     // create init_options
-    RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+    RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
 
     // create node
-    RCCHECK(rclc_node_init_default(&node, "micro_ros_platformio_node", "", &support));
+    RCCHECK(rclc_node_init_default(&node, NODE_NAME, NAMESPACE, &support));
 
     // create action subscriber
     RCCHECK(rclc_subscription_init_default(
@@ -156,6 +163,7 @@ void destroy_entities() {
     // common
     RCSOFTCHECK(rcl_node_fini(&node));
     RCSOFTCHECK(rclc_support_fini(&support));
+    RCSOFTCHECK(rcl_init_options_fini(&init_options));
 }
 
 void microROSTaskFunction(void *parameter) {
