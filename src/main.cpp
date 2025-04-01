@@ -11,6 +11,7 @@
 #include <servoDriver.hpp>
 #include <esp32_led.hpp>
 #include <params.hpp>
+#include "encoder.hpp"
 
 #if !defined(MICRO_ROS_TRANSPORT_ARDUINO_SERIAL)
 #error This example is only avaliable for Arduino framework with serial transport.
@@ -34,6 +35,9 @@ rcl_timer_t obs_timer;
 
 // Global variables shared between the microROS task and the servo control task
 double joint_positions[NUM_ALL_SERVOS] = {0.0};
+float obs_data[NUM_OBS] = {1.0};
+
+void encoderTaskFunction(void *parameter);
 
 #define RCCHECK(fn)                    \
     {                                  \
@@ -55,7 +59,7 @@ double joint_positions[NUM_ALL_SERVOS] = {0.0};
             init = uxr_millis();           \
         }                                  \
         if (uxr_millis() - init > MS) {    \
-            X;                             \
+            X;                             \   
             init = uxr_millis();           \
         }                                  \
     } while (0)
@@ -72,10 +76,10 @@ void action_subscription_callback(const void *msgin) {
 void obs_timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
     RCLC_UNUSED(last_call_time);
     if (timer != NULL) {
-        RCSOFTCHECK(rcl_publish(&obs_pub, &obs_msg_pub, NULL));
         for (size_t i = 0; i < obs_msg_pub.data.capacity; i++) {
-            obs_msg_pub.data.data[i] = 0.0f;
+            obs_msg_pub.data.data[i] = obs_data[i];
         }
+        RCSOFTCHECK(rcl_publish(&obs_pub, &obs_msg_pub, NULL));
     }
 }
 
@@ -210,6 +214,15 @@ void ServoControlTaskFunction(void *parameter) {
     }
 }
 
+void encoderTaskFunction(void *parameter) {
+    EncoderManager encoderManager;
+    encoderManager.begin();
+    while (true) {
+        obs_data[0] = encoderManager.getAngleDegrees();
+        vTaskDelay(UPDATE_ENCODER_DELAY / portTICK_PERIOD_MS);
+    }
+}
+
 void setup() {
     // Configure serial transport
   Serial.begin(115200);
@@ -232,6 +245,7 @@ void setup() {
         NULL                       // Task handle
     );
     delay(100);
+
     xTaskCreate(
         ServoControlTaskFunction,  // Task function
         "Servo Control Task",      // Task name
@@ -241,6 +255,7 @@ void setup() {
         NULL                     // Task handle
     );
     delay(100);
+
     xTaskCreate(
         led_task,    // Task function
         "LED Task",  // Task name
@@ -248,6 +263,16 @@ void setup() {
         &state,      // Task parameters
         0,           // Task priority
         NULL         // Task handle
+    );
+    delay(100);
+
+    xTaskCreate(
+        encoderTaskFunction,
+        "Encoder Task",
+        4096,
+        NULL,
+        1,
+        NULL
     );
     delay(100);
 }

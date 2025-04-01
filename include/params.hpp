@@ -13,10 +13,13 @@
 #define NODE_NAME "micro_ros_platformio_node"
 #define NAMESPACE ""
 #define ESP32_LED 2
+#define ENCODER_SDA 21
+#define ENCODER_SCL 22
 #define UPDATE_SERVO_DELAY 1.0
+#define UPDATE_ENCODER_DELAY 1.0
 const float SERVO_MOVEMENT_STEP = 1.0;
 const size_t NUM_ALL_SERVOS = 1;
-const size_t NUM_OBS = 4;
+const size_t NUM_OBS = 1;
 const uint8_t servoMinAngles[] = {0};
 const uint8_t servoMaxAngles[] = {180};
 const uint8_t servoInitAngles[] = {0};
