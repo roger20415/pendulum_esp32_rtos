@@ -10,7 +10,7 @@ bool EncoderManager::begin() {
 
 float EncoderManager::getAngleDegrees() {
     if (!if_initialized) {
-        return -1.5;
+        return INIT_ENCODER_FAIL_NUM;
     }
     uint16_t raw = encoder.readAngle();
     return raw * AS5600_RAW_TO_DEGREES;

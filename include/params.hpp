@@ -24,6 +24,7 @@ const uint8_t servoMinAngles[] = {0};
 const uint8_t servoMaxAngles[] = {180};
 const uint8_t servoInitAngles[] = {0};
 const size_t SERVO_OFFSET = 0;
+const float INIT_ENCODER_FAIL_NUM = -1.5;
 
 static_assert(sizeof(servoMinAngles) == NUM_ALL_SERVOS * sizeof(uint8_t));
 static_assert(sizeof(servoMaxAngles) == NUM_ALL_SERVOS * sizeof(uint8_t));
