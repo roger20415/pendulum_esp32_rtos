@@ -35,7 +35,7 @@ rcl_timer_t obs_timer;
 
 // Global variables shared between the microROS task and the servo control task
 double joint_positions[NUM_ALL_SERVOS] = {0.0};
-float obs_data[NUM_OBS] = {1.0};
+float obs_data[NUM_OBS] = {0.0};
 
 void encoderTaskFunction(void *parameter);
 
@@ -69,7 +69,7 @@ states state;
 void action_subscription_callback(const void *msgin) {
     const trajectory_msgs__msg__JointTrajectoryPoint *msg = (const trajectory_msgs__msg__JointTrajectoryPoint *)msgin;
     for (size_t i = 0; i < msg->positions.size; ++i) {
-        joint_positions[i + SERVO_OFFSET] = degrees(msg->positions.data[i]);
+        joint_positions[i] = degrees(msg->positions.data[i]) + SERVO_OFFSET;
     }
 }
 
@@ -77,7 +77,7 @@ void obs_timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
     RCLC_UNUSED(last_call_time);
     if (timer != NULL) {
         for (size_t i = 0; i < obs_msg_pub.data.capacity; i++) {
-            obs_msg_pub.data.data[i] = obs_data[i];
+            obs_msg_pub.data.data[i] = obs_data[i] - ENCODER_OFFSET;
         }
         RCSOFTCHECK(rcl_publish(&obs_pub, &obs_msg_pub, NULL));
     }
