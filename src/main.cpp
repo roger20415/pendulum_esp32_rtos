@@ -69,7 +69,7 @@ states state;
 void action_subscription_callback(const void *msgin) {
     const trajectory_msgs__msg__JointTrajectoryPoint *msg = (const trajectory_msgs__msg__JointTrajectoryPoint *)msgin;
     for (size_t i = 0; i < msg->positions.size; ++i) {
-        joint_positions[i] = degrees(msg->positions.data[i]) + SERVO_OFFSET;
+        joint_positions[i] = msg->positions.data[i] + SERVO_OFFSET;
     }
 }
 
@@ -205,7 +205,8 @@ void ServoControlTaskFunction(void *parameter) {
 
     while (true) {
         for (size_t i = 0; i < NUM_ALL_SERVOS; ++i) {
-            servoManager.setServoTargetAngle(i, uint8_t(joint_positions[i]));
+            //servoManager.setServoTargetAngle(i, uint8_t(joint_positions[i]));
+            servoManager.setServoTargetAngle(i, 45);
         }
         servoManager.moveServo();
 

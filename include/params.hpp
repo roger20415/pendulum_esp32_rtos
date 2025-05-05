@@ -20,7 +20,7 @@
 const float SERVO_MOVEMENT_STEP = 1.0;
 const size_t NUM_ALL_SERVOS = 1;
 const size_t NUM_OBS = 1;
-const uint8_t SERVO_OFFSET = 90;  // if PPO action is 0 degree, the servo actually turn to 90 degree.
+const uint8_t SERVO_OFFSET = 82.8;  // if PPO action is 0 degree, the servo actually turn to 90 degree.
 const float ENCODER_OFFSET = 280.0; // if the sensor detectes 280 degree, the actual angle is 0 degree. 
 const float INIT_ENCODER_FAIL_NUM = -1.5;
 const uint8_t servoMinAngles[] = {0};
